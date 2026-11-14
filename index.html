@@ -1,0 +1,2126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slop Quiz</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Arial,sans-serif;color:white;background:#795333}
+button{font-family:inherit;color:white;cursor:pointer;transition:none!important;animation:none!important;-webkit-tap-highlight-color:transparent}
+#viewport{position:fixed;inset:0;overflow:hidden}
+#camera{position:absolute;inset:0 auto 0 0;width:400vw;height:100%;display:flex;transform:translateX(0);transition:transform 850ms linear;will-change:transform}
+.scene{position:relative;flex:0 0 100vw;width:100vw;height:100%;min-height:100%;overflow-x:hidden;overflow-y:auto;display:flex;background:url("woodic.png") center/cover no-repeat}
+
+/* MENU */
+.menuContent{position:absolute;top:0;bottom:0;left:0;width:min(440px,100%);padding:clamp(14px,3.5vw,42px);display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:12px;overflow-y:auto}
+#logo{display:block;width:min(370px,100%);max-height:220px;object-fit:contain;object-position:left center;margin-bottom:20px}
+.gameButton{width:100%;min-height:clamp(46px,8vh,64px);padding:10px 14px;border:2px solid #49301e;border-radius:6px;background:#805632;color:#fff1dc;font-size:clamp(13px,2vw,18px);text-align:center}
+.gameButton:hover,.gameButton:active{background:#805632;transform:none;filter:none}
+.gameButton:disabled{opacity:.45;cursor:not-allowed}
+#worldList{width:100%;display:flex;flex-direction:column;gap:12px}
+.worldButton{text-align:left;padding-left:18px}
+
+/* QUIZ */
+#quizScene{align-items:center;justify-content:center}
+#quizContent{width:min(1150px,96vw);margin:auto;padding:clamp(12px,3vh,30px) 12px calc(125px + env(safe-area-inset-bottom));text-align:center}
+#quizHeader{display:flex;justify-content:center;align-items:center;width:100%;margin-bottom:clamp(15px,3vh,27px)}
+#questionCounter{font-size:clamp(22px,3vw,31px);font-weight:bold;text-align:center}
+#questionText{font-size:clamp(22px,3.8vw,37px);line-height:1.35;margin:20px auto 28px;max-width:1100px;overflow-wrap:anywhere;white-space:pre-line}
+#questionMedia{display:none;width:100%;margin:0 auto 20px}
+#questionMedia img{display:block;width:min(100%,700px);max-height:38vh;object-fit:contain;margin:auto;border-radius:7px}
+#answerGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;width:100%;max-width:1100px;margin:auto}
+.answerButton{position:relative;isolation:isolate;overflow:hidden;width:100%;min-width:0;min-height:clamp(68px,11vh,100px);padding:10px;background:#805632;color:white;border:2px solid #49301e;border-radius:7px;font-size:clamp(15px,2.2vw,21px);overflow-wrap:anywhere}
+.answerButton:hover,.answerButton:active{background:#805632;transform:none}
+.answerButton:disabled{opacity:1;cursor:default}
+.answerButton .answerLabel{position:relative;z-index:2;pointer-events:none}
+.answerButton .answerFeedbackImage{position:absolute;inset:0;z-index:1;display:block;width:100%;height:100%;object-fit:fill;border-radius:5px;pointer-events:none}
+
+/* BOMB */
+#bombHud{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:flex;align-items:center;justify-content:center;gap:clamp(5px,1.5vw,12px);pointer-events:none;z-index:10}
+#bombHud img{width:clamp(38px,7vw,62px);height:clamp(38px,7vw,62px);object-fit:contain}
+#timerText{font-family:monospace;font-size:clamp(21px,4vw,31px);font-weight:bold;white-space:nowrap}
+#timerText.urgent{color:#ff5555}
+
+/* HEARTS */
+#heartCanvas{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:30}
+
+/* JUMPSCARE */
+#jumpscareOverlay{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;background:transparent;overflow:hidden;pointer-events:none}
+#jumpscareOverlay img{
+    display:block;
+    width:100vw;
+    height:100vh;
+    max-width:none;
+    max-height:none;
+    object-fit:cover;
+}
+
+/* SECRET QUESTION */
+#specialEventOverlay{position:absolute;inset:0;z-index:25;display:none;pointer-events:none}
+#specialGun{position:absolute;width:clamp(100px,17vw,155px);height:auto;left:50%;top:50%;opacity:0;transform:translate(-50%,-50%) rotate(var(--gun-angle,0deg));transition:opacity .55s linear;overflow:visible}
+#specialGun.visible{opacity:1}
+
+/* DEATH SCREEN */
+#endingScene{align-items:center;justify-content:center}
+#deathShade{position:absolute;inset:0;background:#000;opacity:0;z-index:1;pointer-events:none;transition:opacity 1.2s ease}
+#endingContent{position:relative;z-index:2;width:min(1050px,94vw);max-height:100%;overflow-y:auto;padding:clamp(12px,3vw,30px);text-align:center}
+#deathPanel,#successPanel{display:none}
+.deathLayout{display:flex;align-items:center;justify-content:center;gap:clamp(16px,5vw,55px);width:100%;text-align:left}
+#civilianImage{display:block;width:clamp(150px,32vw,360px);max-height:60vh;object-fit:contain;opacity:0;flex-shrink:0}
+.deathText{flex:1;min-width:0;opacity:0;visibility:hidden}
+#deathTitle{font-family:"Arimo",Arial,sans-serif;font-size:clamp(38px,7vw,82px);font-weight:700;color:white;margin-bottom:18px}
+#deathMessage{font-family:"Arimo",Arial,sans-serif;font-weight:400;color:#ddd;font-size:clamp(14px,2.5vw,23px);line-height:1.45;max-width:440px}
+#endingScene.deathVisible #deathShade{opacity:1}
+#endingScene.deathVisible #civilianImage{animation:civilianAppear 900ms ease-out 800ms both}
+#endingScene.deathVisible .deathText{animation:deathTextAppear 700ms ease-out 2200ms both}
+@keyframes civilianAppear{from{opacity:0;transform:translateX(-25px)}to{opacity:1;transform:translateX(0)}}
+@keyframes deathTextAppear{0%{opacity:0;visibility:hidden;transform:translateX(25px)}1%{visibility:visible}100%{opacity:1;visibility:visible;transform:translateX(0)}}
+
+/* ENDING BUTTONS */
+#endingButtons{display:flex;flex-direction:column;gap:9px;width:min(330px,85%);margin:24px auto 0;opacity:0}
+#endingScene.deathVisible #endingButtons{animation:buttonsAppear .5s ease-out 3.9s forwards}
+@keyframes buttonsAppear{to{opacity:1}}
+#endingButtons .gameButton{min-height:48px}
+
+/* ANSWER REVIEW */
+#successPanel h1{font-size:clamp(32px,6vw,60px);margin:5px 0 15px}
+#successPanel h2{font-size:clamp(17px,3vw,24px)}
+#answerResults{width:100%;max-height:55vh;overflow-y:auto;text-align:left;padding:8px;background:rgba(0,0,0,.35);border-radius:6px}
+.resultItem{padding:12px;border-bottom:1px solid rgba(255,255,255,.2);overflow-wrap:anywhere}
+.resultQuestion{font-weight:bold;margin-bottom:8px}
+.resultYourAnswer{margin-bottom:4px;color:#ffe0b0}
+.resultCorrectAnswer{color:#a9e69c}
+.resultItem.incorrect .resultYourAnswer{color:#ff9999}
+
+/* RESPONSIVE */
+@media(max-width:550px){
+    .menuContent{width:min(390px,100%);padding:18px}
+    #logo{width:min(300px,90%);max-height:170px}
+    #answerGrid{grid-template-columns:1fr;gap:9px}
+    .answerButton{min-height:65px}
+    #quizContent{padding-top:12px}
+    #questionText{font-size:clamp(20px,5vw,28px)}
+    #questionMedia img{max-height:26vh}
+    .deathLayout{gap:12px}
+}
+@media(max-width:370px){
+    .deathLayout{flex-direction:column;text-align:center}
+    #civilianImage{width:min(170px,42vw);max-height:28vh}
+    #deathMessage{margin-left:auto;margin-right:auto}
+    #deathTitle{font-size:37px}
+}
+@media(max-height:520px){
+    .menuContent{padding-top:8px;padding-bottom:8px;gap:6px}
+    #logo{max-height:100px;margin-bottom:5px}
+    #quizContent{padding-top:8px;padding-bottom:90px}
+    #questionText{margin:10px 0 13px}
+    .answerButton{min-height:48px}
+    #bombHud{bottom:4px}
+    #questionMedia img{max-height:22vh}
+}
+</style>
+</head>
+
+<body>
+
+<div id="viewport">
+<div id="camera">
+
+<section class="scene" id="homeScene">
+    <div class="menuContent">
+        <img id="logo" src="slop-text.png" alt="Slop Quiz">
+        <button class="gameButton" id="startButton">START</button>
+    </div>
+</section>
+
+<section class="scene" id="worldScene">
+    <div class="menuContent">
+        <div id="worldList"></div>
+    </div>
+</section>
+
+<section class="scene" id="quizScene">
+    <div id="quizContent">
+        <div id="quizHeader">
+            <div id="questionCounter">0/20</div>
+        </div>
+        <div id="questionMedia"></div>
+        <div id="questionText"></div>
+        <div id="answerGrid"></div>
+    </div>
+
+    <div id="bombHud">
+        <img src="bomb.png" alt="Bomb">
+        <span id="timerText">01:30</span>
+    </div>
+
+    <div id="specialEventOverlay">
+        <img id="specialGun" src="gun.png" alt="Gun">
+    </div>
+</section>
+
+<section class="scene" id="endingScene">
+    <div id="deathShade"></div>
+    <div id="endingContent">
+
+        <div id="deathPanel">
+            <div class="deathLayout">
+                <img id="civilianImage" src="cilvil.png" alt="Civilian">
+                <div class="deathText">
+                    <div id="deathTitle">YOU DIED</div>
+                    <div id="deathMessage"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="successPanel">
+            <h1>YOU SURVIVED</h1>
+            <h2>YOUR ANSWERS</h2>
+            <div id="answerResults"></div>
+        </div>
+
+        <div id="endingButtons">
+            <button class="gameButton" id="retryButton">TRY AGAIN</button>
+            <button class="gameButton" id="homeButton">GO BACK TO MENU</button>
+        </div>
+    </div>
+</section>
+
+</div>
+</div>
+
+<canvas id="heartCanvas"></canvas>
+
+<div id="jumpscareOverlay" aria-hidden="true">
+    <img id="jumpscareImage" alt="">
+</div>
+
+<script>
+
+/* =====================================================
+   CONFIGURATION
+===================================================== */
+
+const CONFIG = {
+    totalQuestions:350,
+    questionsPerRun:20,
+    timeLimit:90,
+    startingLives:3,
+
+    correctFeedbackTime:650,
+    wrongFeedbackTime:650,
+    wrongSoundDelay:500,
+    jumpscareDuration:500,
+
+    musicVolume:0.6,
+    deathMusicVolume:0.85,
+    secretChance:0.5,
+    correctVolume:0.3,
+    wrongVolume:0.3,
+
+    worlds:[
+        {name:"Unit 4: The Neighbourhood Boogaloo",playable:true},
+        {name:"nothing",playable:false},
+        {name:"nothing",playable:false}
+    ],
+
+    images:{
+        correct:"correct.png",
+        wrong:"wrong.png",
+        civilian:"cilvil.png",
+        secretFace:"screwu.png",
+        jumpscare:"jumpscare.gif"
+    },
+
+    sounds:{
+        correct:"correct.mp3",
+        wrong:"wrong.mp3",
+        heartSmash:"heart_smash.mp3",
+        loseMock:"lose_mock.mp3",
+        music:"slop-time.mp3",
+        deathMusic:"memorian.mp3",
+        shoot:"shoot.mp3",
+        jumpscare:"jumpscare.mp3",
+        hurtSounds:["hurt1.mp3","hurt2.mp3","hurt3.mp3"]
+    },
+
+    deathMessages:[
+        "Was found wandering the neighbourhood.",
+        "Took the wrong turning.",
+        "Forgot to look both ways.",
+        "Was defeated by basic directions.",
+        "Contracted a severe case of death.",
+        "Sadly passed away of vocabulary.",
+        "The neighbourhood was not forgiving.",
+        "Could not survive one more question.",
+        "Got absolutely lost.",
+        "Was last seen asking for directions.",
+        "The streets were simply too crowded.",
+        "Failed to locate the nearest railway station.",
+        "Made a questionable life decision.",
+        "The bomb won. It always wins.",
+        "Was never seen in the neighbourhood again.",
+        "Tried to find the nearest post office.",
+        "The English language claimed another victim.",
+        "Forgot what left and right meant.",
+        "Ran out of time and brain cells.",
+        "Bro did not survive Unit 4.",
+        "SON 🥀💔",
+        "pursuer valley 🥀"
+    ]
+};
+
+/* =====================================================
+   ONLINE PICTURE SOURCES
+===================================================== */
+
+const PICTURES = {
+    gallery:"https://d3d00swyhr67nd.cloudfront.net/w800h800/collection_photos/not-ncmg-collection-image-2-1.jpg",
+    cathedral:"https://thumb.wikimedia.org/wikipedia/commons/thumb/2/24/Exeter_Cathedral_exterior.jpg/960px-Exeter_Cathedral_exterior.jpg",
+    station:"https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Platform_12_of_Delhi_railway_station%2C_India.jpg/1280px-Platform_12_of_Delhi_railway_station%2C_India.jpg",
+    hoiAnBridge:"https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Japanese_Covered_Bridge_%28Cau_Chua_Pagoda%29%2C_Hoi_An%2C_Vietnam_%287090643937%29.jpg/1200px-Japanese_Covered_Bridge_%28Cau_Chua_Pagoda%29.jpg",
+    workshop:"https://dfekkasblsw1n.cloudfront.net/accounts/506/files/01HSSJY2ZYWJGYRHMK5P3T70F4/475795-preview.webp",
+    crossing:"https://upload.wikimedia.org/wikipedia/commons/7/76/Baywalk_stoplights_%28Roxas_Boulevard%2C_Malate%2C_Manila%3B_2017-01-01%29.jpg",
+    square:"https://www.candidatlibre.net/images/uploads/prefectures/prefecture-du-tarn-et-garonne.jpg",
+    suburb:"https://www.revoy.com.au/public/assets/spor-2-min.jpg",
+
+    park:"https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1000",
+    restaurant:"https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1000",
+    cafe:"https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1000",
+    beach:"https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1000",
+    city:"https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1000",
+    houses:"https://images.unsplash.com/photo-1494526585095-c41746248156?w=1000",
+    street:"https://images.unsplash.com/photo-1519608487953-e999c86e7455?w=1000",
+    market:"https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=1000",
+    library:"https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=1000",
+    museum:"https://images.unsplash.com/photo-1561214115-f2f134cc4912?w=1000",
+    cinema:"https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1000",
+    temple:"https://images.unsplash.com/photo-1548013146-72479768bada?w=1000",
+    bridge:"https://images.unsplash.com/photo-1519608487953-e999c86e7455?w=1000",
+    traffic:"https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=1000"
+};
+
+
+/* =====================================================
+   AUDIO
+===================================================== */
+
+const music=new Audio(CONFIG.sounds.music);
+music.loop=true;
+music.volume=CONFIG.musicVolume;
+music.preload="auto";
+
+const deathMusic=new Audio(CONFIG.sounds.deathMusic);
+deathMusic.loop=true;
+deathMusic.volume=CONFIG.deathMusicVolume;
+deathMusic.preload="auto";
+
+let hurtSound=null;
+let jumpscareSound=null;
+let deathSequenceToken=0;
+
+function stopJumpscareSound(){
+    if(jumpscareSound){
+        jumpscareSound.pause();
+        jumpscareSound.currentTime=0;
+        jumpscareSound=null;
+    }
+}
+
+function stopHurtSound(){
+    if(hurtSound){
+        hurtSound.pause();
+        hurtSound.currentTime=0;
+        hurtSound=null;
+    }
+}
+
+function playRandomHurtSound(){
+    stopHurtSound();
+    hurtSound=playSound(randomItem(CONFIG.sounds.hurtSounds));
+}
+
+function playSound(filename,volume=1){
+    const sound=new Audio(filename);
+    sound.volume=volume;
+    sound.preload="auto";
+    sound.play().catch(error=>console.warn("Could not play:",filename,error));
+    return sound;
+}
+
+function playSoundAndWait(filename,volume=1){
+    return new Promise(resolve=>{
+        const sound=new Audio(filename);
+        let finished=false;
+
+        function finish(){
+            if(finished)return;
+            finished=true;
+            sound.removeEventListener("ended",finish);
+            sound.removeEventListener("error",finish);
+            resolve();
+        }
+
+        sound.volume=volume;
+        sound.preload="auto";
+        sound.addEventListener("ended",finish);
+        sound.addEventListener("error",finish);
+        sound.play().catch(finish);
+    });
+}
+
+async function playSoundsAndWait(filenames){
+    await Promise.all(filenames.map(filename=>playSoundAndWait(filename)));
+}
+
+function delay(ms){
+    return new Promise(resolve=>setTimeout(resolve,ms));
+}
+
+function getGifFirstLoopDuration(bytes){
+    if(!bytes||bytes.length<13)return null;
+
+    const signature=String.fromCharCode(...bytes.slice(0,6));
+    if(signature!=="GIF87a"&&signature!=="GIF89a")return null;
+
+    let offset=13;
+    const screenPacked=bytes[10];
+
+    if(screenPacked&0x80){
+        const globalTableSize=3*(1<<((screenPacked&0x07)+1));
+        offset+=globalTableSize;
+    }
+
+    let pendingDelay=100;
+    let totalDuration=0;
+    let frameCount=0;
+
+    function skipSubBlocks(){
+        while(offset<bytes.length){
+            const size=bytes[offset++];
+            if(size===0)return true;
+            offset+=size;
+            if(offset>bytes.length)return false;
+        }
+        return false;
+    }
+
+    while(offset<bytes.length){
+        const marker=bytes[offset++];
+
+        if(marker===0x3B)break;
+
+        if(marker===0x21){
+            if(offset>=bytes.length)break;
+            const label=bytes[offset++];
+
+            if(label===0xF9){
+                if(offset>=bytes.length)break;
+                const blockSize=bytes[offset++];
+
+                if(blockSize>=4&&offset+blockSize<=bytes.length){
+                    const delayCentiseconds=bytes[offset+1]|(bytes[offset+2]<<8);
+                    pendingDelay=delayCentiseconds>0?delayCentiseconds*10:100;
+                }
+
+                offset+=blockSize;
+                if(bytes[offset]===0)offset++;
+            }else{
+                if(!skipSubBlocks())break;
+            }
+            continue;
+        }
+
+        if(marker===0x2C){
+            if(offset+9>bytes.length)break;
+            const imagePacked=bytes[offset+8];
+            offset+=9;
+
+            if(imagePacked&0x80){
+                const localTableSize=3*(1<<((imagePacked&0x07)+1));
+                offset+=localTableSize;
+            }
+
+            if(offset>=bytes.length)break;
+            offset++;
+
+            if(!skipSubBlocks())break;
+
+            totalDuration+=pendingDelay;
+            frameCount++;
+            pendingDelay=100;
+            continue;
+        }
+
+        break;
+    }
+
+    return frameCount>0&&totalDuration>0?totalDuration:null;
+}
+
+async function getJumpscareDuration(){
+    try{
+        const response=await fetch(CONFIG.images.jumpscare,{cache:"no-store"});
+        if(!response.ok)throw new Error("Could not read jumpscare GIF metadata");
+        const bytes=new Uint8Array(await response.arrayBuffer());
+        const duration=getGifFirstLoopDuration(bytes);
+        return duration||CONFIG.jumpscareDuration;
+    }catch(error){
+        return CONFIG.jumpscareDuration;
+    }
+}
+
+async function playJumpscare(){
+    const overlay=document.getElementById("jumpscareOverlay");
+    const image=document.getElementById("jumpscareImage");
+    const duration=await getJumpscareDuration();
+
+    return new Promise(resolve=>{
+        let finished=false;
+        let finishTimer=null;
+
+        function finish(){
+            if(finished)return;
+            finished=true;
+            clearTimeout(finishTimer);
+            overlay.style.display="none";
+            image.onload=null;
+            image.onerror=null;
+            image.removeAttribute("src");
+            stopJumpscareSound();
+            resolve();
+        }
+
+        function startPlayback(){
+            if(finished)return;
+            stopJumpscareSound();
+            jumpscareSound=playSound(CONFIG.sounds.jumpscare);
+            finishTimer=setTimeout(finish,duration);
+        }
+
+        overlay.style.display="flex";
+        image.onload=startPlayback;
+        image.onerror=()=>{
+            console.warn("Could not load jumpscare.gif");
+            startPlayback();
+        };
+        image.removeAttribute("src");
+        requestAnimationFrame(()=>{
+            image.src=CONFIG.images.jumpscare;
+        });
+    });
+}
+
+function startMusic(){
+    stopDeathMusic();
+    music.pause();
+    music.currentTime=0;
+    music.volume=CONFIG.musicVolume;
+    music.play().catch(error=>console.warn("Music playback failed:",error));
+}
+
+function stopMusic(){
+    music.pause();
+    music.currentTime=0;
+}
+
+function startDeathMusic(){
+    stopMusic();
+    deathMusic.pause();
+    deathMusic.currentTime=0;
+    deathMusic.volume=CONFIG.deathMusicVolume;
+    deathMusic.play().catch(error=>console.warn("Memorian music failed:",error));
+}
+
+function stopDeathMusic(){
+    deathMusic.pause();
+    deathMusic.currentTime=0;
+}
+
+
+/* =====================================================
+   UTILITIES
+===================================================== */
+
+function shuffle(array){
+    const result=[...array];
+
+    for(let i=result.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [result[i],result[j]]=[result[j],result[i]];
+    }
+
+    return result;
+}
+
+function randomItem(array){
+    return array[Math.floor(Math.random()*array.length)];
+}
+
+function getWrongAnswers(pool,answer){
+    return shuffle(pool.filter(item=>item!==answer)).slice(0,3);
+}
+
+
+/* =====================================================
+   QUESTION BANK
+===================================================== */
+
+const QUESTION_BANK=[];
+
+function addQuestion(question,answer,wrongAnswers,topic){
+    const wrong=[...new Set(wrongAnswers.filter(item=>item!==answer))].slice(0,3);
+
+    if(wrong.length!==3){
+        throw new Error("Invalid choices: "+question);
+    }
+
+    QUESTION_BANK.push({
+        id:QUESTION_BANK.length+1,
+        question,
+        answer,
+        choices:shuffle([answer,...wrong]),
+        topic
+    });
+}
+
+function addPairQuestions(question1,question2,answer,wrongAnswers,topic){
+    addQuestion(question1,answer,wrongAnswers,topic);
+    addQuestion(question2,answer,wrongAnswers,topic);
+}
+
+function checkCategoryCount(topic,start){
+    const count=QUESTION_BANK.length-start;
+
+    if(count!==50){
+        throw new Error(`${topic} has ${count} questions instead of 50.`);
+    }
+}
+
+
+/* =====================================================
+   1. VOCABULARY — 50 QUESTIONS
+===================================================== */
+
+let categoryStart=QUESTION_BANK.length;
+
+const vocabulary=[
+    ["art gallery","a place where people look at paintings and other works of art","We visited an ____ to look at paintings."],
+    ["busy","full of people, traffic or activity","The street has many people and cars. It is ____."],
+    ["cathedral","a large and important Christian church","We visited the large old ____ in the city."],
+    ["cross","to go from one side of a road to the other","Wait for the green light before you ____ the road."],
+    ["dislike","to not like something","I ____ noisy streets. I do not like them."],
+    ["famous","known by many people","The old town is ____ for its beautiful buildings."],
+    ["faraway","a long distance away","They live in a ____ village a long way from here."],
+    ["finally","after a long time; at last","We looked for the station and ____ found it."],
+    ["narrow","not wide","The street is so ____ that two cars cannot pass easily."],
+    ["outdoor","happening outside, not inside","Football in the park is an ____ activity."],
+    ["railway station","a place where trains stop for passengers","We caught the train at the ____."],
+    ["sandy","covered with or containing sand","The beach is ____ and covered with sand."],
+    ["square","an open public area in a town or city","People meet in the town ____."],
+    ["suburb","an area outside the centre of a city","They live in a ____ outside the city centre."],
+    ["turning","a place where a road changes direction","Take the next ____ on the right."],
+    ["workshop","a place where things are made or repaired","My uncle repairs bikes in his ____."],
+    ["peaceful","quiet and calm","The village is quiet and ____."],
+    ["crowded","full of too many people","The market is very ____ on Sundays."],
+    ["modern","new and using recent designs or technology","That building is very ____."],
+    ["historic","important because of its history","Hoi An is famous for its ____ buildings."],
+    ["polluted","dirty because of harmful substances","The river is ____ because people throw rubbish into it."],
+    ["convenient","easy to use or suitable for your needs","The shop near my home is very ____."],
+    ["fantastic","extremely good","The view from the bridge is ____."],
+    ["location","the place where something is","The hotel's ____ is near the beach."],
+    ["neighbourhood","the area around where someone lives","There is a park in my ____."]
+];
+
+const vocabularyWords=vocabulary.map(item=>item[0]);
+
+vocabulary.forEach(([word,meaning,sentence])=>{
+    const wrong=getWrongAnswers(vocabularyWords,word);
+
+    addPairQuestions(
+        `Which word means "${meaning}"?`,
+        sentence,
+        word,
+        wrong,
+        "Vocabulary"
+    );
+});
+
+checkCategoryCount("Vocabulary",categoryStart);
+
+
+/* =====================================================
+   2. NEIGHBOURHOOD PLACES — 50 QUESTIONS
+===================================================== */
+
+categoryStart=QUESTION_BANK.length;
+
+const places=[
+    ["art gallery","a place where people see paintings and sculptures","We went to the ____ to see some paintings."],
+    ["cathedral","a large and important Christian church","Tourists visited the old ____ in the city."],
+    ["railway station","a place where trains stop","We waited for our train at the ____."],
+    ["square","an open public area in a town","People gathered in the town ____."],
+    ["workshop","a place where people make or repair things","My uncle fixes cars in his ____."],
+    ["park","a green public area where people relax","Children play football in the ____."],
+    ["restaurant","a place where people pay to eat meals","We had lunch at a ____."],
+    ["café","a place where people buy coffee and light food","Let's meet at the ____ for a drink."],
+    ["factory","a building where products are made","Many people work in the large ____."],
+    ["theatre","a place where people watch plays","We watched a play at the ____."],
+    ["cinema","a place where people watch films","There is a new film at the ____."],
+    ["post office","a place where people send letters and parcels","I went to the ____ to post a letter."],
+    ["museum","a place where people learn about history and objects","We saw old objects at the ____."],
+    ["stadium","a large place where people watch sports","Thousands of fans watched football at the ____."],
+    ["temple","a building where people worship","Visitors took off their shoes before entering the ____."],
+    ["pagoda","a religious building often found in Asian countries","We visited an old ____ near the lake."],
+    ["palace","a large and impressive home of a king or queen","The king lived in a beautiful ____."],
+    ["market","a place where people buy and sell things","My mother buys fresh vegetables at the ____."],
+    ["library","a place where people borrow or read books","I borrowed a book from the ____."],
+    ["hospital","a place where doctors and nurses treat sick people","The ambulance took him to the ____."],
+    ["gym","a place where people exercise","I go to the ____ to work out."],
+    ["supermarket","a large shop selling food and household goods","We bought milk and bread at the ____."],
+    ["grocery store","a small shop selling food and everyday items","There is a ____ on the corner of my street."],
+    ["bus stop","a place where people wait for buses","We waited at the ____ for ten minutes."],
+    ["beach","a place beside the sea with sand or stones","We swam and played on the ____."]
+];
+
+const placeWords=places.map(item=>item[0]);
+
+places.forEach(([word,meaning,sentence])=>{
+    const wrong=getWrongAnswers(placeWords,word);
+
+    addPairQuestions(
+        `Which place is described as "${meaning}"?`,
+        sentence,
+        word,
+        wrong,
+        "Neighbourhood places"
+    );
+});
+
+checkCategoryCount("Neighbourhood places",categoryStart);
+
+
+/* =====================================================
+   3. DIRECTIONS — 50 QUESTIONS
+===================================================== */
+
+categoryStart=QUESTION_BANK.length;
+
+const directions=[
+    ["Go straight.","Continue ahead without turning.","You do not need to turn left or right. What should you do?"],
+    ["Turn left.","Change direction to your left.","The library is on the street to your left. What should you do?"],
+    ["Turn right.","Change direction to your right.","At the corner, go to the right. What should you do?"],
+    ["Cross the road.","Go from one side of the road to the other.","The shop is on the opposite side of the street."],
+    ["Go past the bank.","Continue walking until you have passed the bank.","Walk beyond the bank before continuing."],
+    ["Take the first turning on the left.","Use the first side street on your left.","The first side street on your left leads to the park."],
+    ["Take the second turning on the left.","Use the second side street on your left.","Do not use the first left street; use the next one."],
+    ["Take the first turning on the right.","Use the first side street on your right.","The museum is along the first road on your right."],
+    ["Turn left at the traffic lights.","Change direction to the left where the traffic lights are.","At the traffic lights, go left."],
+    ["Turn right at the traffic lights.","Change direction to the right where the traffic lights are.","At the traffic lights, go right."],
+    ["Go along this street.","Continue following the same street.","The station is farther down the road you are on."],
+    ["Walk across the bridge.","Use the bridge to get to the other side.","The path goes over the river."],
+    ["Keep going.","Continue moving in the same direction.","You are going the correct way. Do not stop."],
+    ["Go back.","Return in the direction you came from.","You have passed the shop, so return towards it."],
+    ["It's next to the bank.","It is beside the bank.","The café is immediately beside the bank."],
+    ["It's opposite the park.","It is across from the park.","The museum is on the other side of the road from the park."],
+    ["It's between the café and the bank.","It is in the middle of the café and the bank.","The shop is in the space separating two buildings."],
+    ["It's on your left.","It is to the left-hand side of you.","You are walking forward and the school is to your left."],
+    ["It's on your right.","It is to the right-hand side of you.","You are walking forward and the cinema is to your right."],
+    ["Continue to the end of the road.","Keep walking until the road finishes.","Do not turn before reaching the end of the street."],
+    ["Take the next street on the right.","Turn into the next road on your right.","The next road to your right is the correct one."],
+    ["Go through the square.","Walk across the open public area.","The shortest route takes you across the town's open area."],
+    ["Cross at the zebra crossing.","Use the marked pedestrian crossing.","There are white stripes on the road for pedestrians."],
+    ["Go towards the cathedral.","Walk in the direction of the cathedral.","You can see the cathedral ahead. Walk towards it."],
+    ["Ask someone for directions.","Request help from another person to find the way.","You do not know the route. You should request help."]
+];
+
+const directionPhrases=directions.map(item=>item[0]);
+
+directions.forEach(([phrase,meaning,situation])=>{
+    const wrong=getWrongAnswers(directionPhrases,phrase);
+
+    addPairQuestions(
+        `Which direction means "${meaning}"?`,
+        situation,
+        phrase,
+        wrong,
+        "Directions"
+    );
+});
+
+checkCategoryCount("Directions",categoryStart);
+
+
+/* =====================================================
+   4. COMPARATIVE ADJECTIVES — 50 QUESTIONS
+===================================================== */
+
+categoryStart=QUESTION_BANK.length;
+
+const comparatives=[
+    ["small","smaller",["smallier","smallest","more smaller"]],
+    ["tall","taller",["tallier","tallest","more taller"]],
+    ["big","bigger",["biger","biggest","more bigger"]],
+    ["nice","nicer",["niceer","nicest","more nicer"]],
+    ["large","larger",["largeer","largest","more larger"]],
+    ["noisy","noisier",["noisyier","noisiest","more noisier"]],
+    ["busy","busier",["busyer","busiest","more busier"]],
+    ["narrow","narrower",["narrowier","narrowest","more narrower"]],
+    ["cheap","cheaper",["cheapier","cheapest","more cheaper"]],
+    ["old","older",["oldier","oldest","more older"]],
+    ["new","newer",["newest","newerest","more newer"]],
+    ["quiet","quieter",["quietter","quietest","more quieter"]],
+    ["clean","cleaner",["cleanest","cleanier","more cleaner"]],
+    ["safe","safer",["safeer","safest","more safer"]],
+    ["wide","wider",["wideer","widest","more wider"]],
+    ["expensive","more expensive",["expensiver","most expensive","more expensiver"]],
+    ["peaceful","more peaceful",["peacefuler","most peaceful","more peacefuler"]],
+    ["beautiful","more beautiful",["beautifuler","most beautiful","more beautifuller"]],
+    ["convenient","more convenient",["convenienter","most convenient","more convenienter"]],
+    ["modern","more modern",["moderner","most modern","more moderner"]],
+    ["historic","more historic",["historicer","most historic","more historicer"]],
+    ["interesting","more interesting",["interestinger","most interesting","more interestinger"]],
+    ["polluted","more polluted",["polluteder","most polluted","more polluteder"]],
+    ["crowded","more crowded",["crowdeder","most crowded","more crowdeder"]],
+    ["fantastic","more fantastic",["fantasticker","most fantastic","more fantasticker"]]
+];
+
+comparatives.forEach(([adjective,answer,wrong])=>{
+    addPairQuestions(
+        `What is the comparative form of "${adjective}"?`,
+        `Complete the sentence: "My neighbourhood is ____ than yours." (${adjective})`,
+        answer,
+        wrong,
+        "Comparative adjectives"
+    );
+});
+
+checkCategoryCount("Comparative adjectives",categoryStart);
+
+
+/* =====================================================
+   5. PRONUNCIATION — 50 QUESTIONS
+   UNIT 4 FOCUS: /iː/ AND /ɪ/
+===================================================== */
+const pronunciationGroups = {
+    longE: [
+        "see", "tree", "street", "beach", "green",
+        "teacher", "people", "sleep", "meet", "three",
+        "sheep", "clean", "dream", "week", "leave",
+        "cheese", "feet", "easy", "these", "evening",
+        "read", "speak", "team", "season", "beautiful"
+    ],
+    shortI: [
+        "sit", "big", "city", "village", "river",
+        "building", "busy", "cinema", "little", "window",
+        "bridge", "kitchen", "sister", "visit", "swimming",
+        "different", "history", "quick", "fish", "milk",
+        "minute", "ticket", "picture", "pretty", "winter"
+    ]
+};
+
+Object.entries(pronunciationGroups).forEach(([groupKey, words]) => {
+    const otherWords = Object.entries(pronunciationGroups)
+        .filter(([key]) => key !== groupKey)
+        .flatMap(([, list]) => list);
+
+    words.forEach(word => {
+        const answer = randomItem(words.filter(item => item !== word));
+
+        addQuestion(
+            `Which word below contains the same target vowel sound as "${word}"?`,
+            answer,
+            getWrongAnswers(otherWords, answer),
+            "Pronunciation"
+        );
+    });
+});
+
+/* =====================================================
+   6. COMMUNICATION — 50 QUESTIONS
+===================================================== */
+
+categoryStart=QUESTION_BANK.length;
+
+const communication=[
+    ["Could you tell me the way to the cinema, please?","politely ask for directions to the cinema",["Go straight and turn left.","It's next to the bank.","My pleasure."]],
+    ["Where's the nearest post office, please?","ask where the closest post office is",["How expensive is the post office?","What time does the cinema start?","Do you dislike the post office?"]],
+    ["Excuse me.","politely get someone's attention before asking a question",["Finally!","Go straight.","Turn right."]],
+    ["My pleasure.","reply politely when someone thanks you",["Turn left.","We're lost.","Go straight."]],
+    ["It's next to the bank.","explain that a place is beside the bank",["It is more expensive.","Go straight and cross the road.","I dislike crowded streets."]],
+    ["No, let's walk there.","suggest walking instead of cycling",["Take the second turning.","It is very crowded.","Where is the cathedral?"]],
+    ["Let's go to Chua Cau.","suggest visiting Chua Cau",["We are lost.","Take the next turning.","The street is narrow."]],
+    ["We're lost.","tell someone that you cannot find your destination",["We're famous.","We're peaceful.","We're convenient."]],
+    ["Go straight, then turn right.","give someone directions",["Where is the railway station?","Could you help me, please?","What's the nearest post office?"]],
+    ["Shall we go by bicycle?","make a suggestion about travelling by bicycle",["Where is the cathedral?","I'm afraid we're lost.","It's next to the park."]],
+    ["How can I get to the railway station?","ask how to reach the railway station",["The station is beautiful.","I like trains.","It is more crowded."]],
+    ["Is it far from here?","ask about the distance to a place",["What is it made of?","Do you like it?","Where did you buy it?"]],
+    ["Turn left at the traffic lights.","give directions using traffic lights",["Could you repeat that?","Where are the traffic lights?","Thank you very much."]],
+    ["It's opposite the supermarket.","describe a location across from the supermarket",["It is inside the supermarket.","It is behind the supermarket.","It is under the supermarket."]],
+    ["Can you show me on the map?","ask someone to point out a route on a map",["I want to buy a map.","The map is expensive.","Let's eat something."]],
+    ["I'm looking for the museum.","explain that you are trying to find the museum",["I work at the museum.","I visited the museum yesterday.","The museum is modern."]],
+    ["Go past the park and turn right.","tell someone to pass the park before turning right",["Turn left before the park.","Stop at the park.","Go back to the park."]],
+    ["Thank you for your help.","thank someone for giving you assistance",["Where is the bank?","I am looking for the bank.","Turn right at the bank."]],
+    ["Could you repeat that, please?","politely ask someone to say something again",["I know the way.","Go straight ahead.","It is next to the café."]],
+    ["The cathedral is on your left.","tell someone the cathedral is to their left",["The cathedral is behind you.","The cathedral is on your right.","The cathedral is far away."]],
+    ["Let's meet at the town square.","suggest a meeting place",["How do I cross the road?","Where is the town square?","The town square is noisy."]],
+    ["Which bus goes to the city centre?","ask which bus travels to the city centre",["How old is the bus?","Where is the bus driver?","Do you like the city?"]],
+    ["I prefer the suburbs because they are quieter.","explain a preference for quieter suburbs",["I dislike all quiet places.","The suburbs are always crowded.","I prefer busy roads."]],
+    ["This street is narrower than that one.","compare the width of two streets",["This street is the widest.","This street is more narrowest.","This street is as narrowest."]],
+    ["The park is a wonderful place to relax.","describe the park positively",["The park is a railway station.","The park is very polluted.","The park is a factory."]]
+];
+
+communication.forEach(([answer,meaning,wrong])=>{
+    addPairQuestions(
+        `Which sentence can you use to ${meaning}?`,
+        `Choose the best expression: ${meaning}.`,
+        answer,
+        wrong,
+        "Communication"
+    );
+});
+
+checkCategoryCount("Communication",categoryStart);
+
+
+/* =====================================================
+   7. READING — 50 QUESTIONS
+   EACH QUESTION CONTAINS ITS OWN PASSAGE
+===================================================== */
+
+categoryStart=QUESTION_BANK.length;
+
+const readingPassages=[
+    {
+        passage:`READ THE PASSAGE:
+
+Khang lives in the suburbs of Da Nang City. He enjoys living there because there are beautiful parks and sandy beaches nearby. The weather is usually fine, and he likes doing outdoor activities. There are also shops, restaurants and markets close to his home. Khang thinks the people are friendly and the food is delicious. However, he does not like the busy streets and modern office buildings in the city centre.`,
+        questions:[
+            ["Where does Khang live?","In the suburbs of Da Nang City",["In the centre of Ha Noi","In a village near Hue","In the centre of Ho Chi Minh City"]],
+            ["What does Khang enjoy doing?","Outdoor activities",["Playing computer games all day","Working in an office","Watching trains"]],
+            ["What is near Khang's home?","Beautiful parks and sandy beaches",["A large airport and a factory","Only office buildings","A railway station and a stadium"]],
+            ["What is the weather usually like?","Fine",["Snowy","Stormy every day","Very cold"]],
+            ["What can Khang find close to his home?","Shops, restaurants and markets",["Only schools and hospitals","Only factories","No shops or restaurants"]],
+            ["How does Khang describe the people?","Friendly",["Unfriendly","Rude","Dangerous"]],
+            ["What does Khang think about the food?","It is delicious.",["It is expensive and terrible.","It is always cold.","There is no food nearby."]],
+            ["What does Khang dislike?","Busy streets and modern office buildings",["Parks and beaches","Friendly people","Outdoor activities"]],
+            ["Which city does Khang live near?","Da Nang",["Ha Noi","Can Tho","Da Lat"]],
+            ["Which statement is TRUE?","Khang enjoys living in the suburbs.",["Khang dislikes all outdoor activities.","Khang lives beside a factory.","Khang thinks the people are unfriendly."]]
+        ]
+    },
+    {
+        passage:`READ THE PASSAGE:
+
+Mai lives in a small neighbourhood near the city centre. There is a library opposite her school and a supermarket next to the library. A quiet park is behind her house. Every Saturday, Mai walks to the market with her mother to buy vegetables and fruit. Her father usually goes to work by bus because the bus stop is near their home. Mai likes her neighbourhood because everything she needs is close by.`,
+        questions:[
+            ["Where does Mai live?","Near the city centre",["In the countryside","Near an airport","In a mountain village"]],
+            ["What is opposite Mai's school?","A library",["A supermarket","A park","A bus stop"]],
+            ["Where is the supermarket?","Next to the library",["Behind Mai's house","Opposite the park","Inside the school"]],
+            ["What is behind Mai's house?","A quiet park",["A factory","A cinema","A railway station"]],
+            ["When does Mai go to the market?","Every Saturday",["Every Monday","Every Friday","Every Sunday evening"]],
+            ["Who goes to the market with Mai?","Her mother",["Her father","Her teacher","Her brother"]],
+            ["What do they buy at the market?","Vegetables and fruit",["Books and clothes","Tickets and toys","Furniture and phones"]],
+            ["How does Mai's father usually go to work?","By bus",["By train","By bicycle","On foot"]],
+            ["Why does Mai's father find the bus convenient?","The bus stop is near their home.",["The bus is free.","His office is inside their home.","There are no roads nearby."]],
+            ["Why does Mai like her neighbourhood?","Everything she needs is close by.",["It has no shops.","It is far from the city.","It is always noisy."]]
+        ]
+    },
+    {
+        passage:`READ THE PASSAGE:
+
+Phong, Nick and Khang are visiting Hoi An. Nick wants to visit Chua Cau, a famous covered bridge. Phong notices that Tan Ky House is nearer on the map, but the boys decide to walk to Chua Cau. Phong gives them directions, but soon they are not sure where they are. They ask a girl for help. She tells them to keep going straight and then turn right. Her directions help them find a quicker route.`,
+        questions:[
+            ["Where are the boys visiting?","Hoi An",["Ha Noi","Da Nang city centre","Hue"]],
+            ["Which place does Nick want to visit?","Chua Cau",["Tan Ky House","A railway station","An art gallery"]],
+            ["What is nearer according to the map?","Tan Ky House",["Chua Cau","The airport","The beach"]],
+            ["How do the boys decide to travel?","They walk.",["They take a train.","They ride a bus.","They drive a car."]],
+            ["Who gives the boys their first directions?","Phong",["Nick","Khang","The girl"]],
+            ["What problem do the boys have?","They are not sure where they are.",["They lose their tickets.","They cannot find their bicycles.","They miss their train."]],
+            ["Who helps the boys?","A girl",["A police officer","A shopkeeper","A train driver"]],
+            ["What does the girl tell them to do first?","Keep going straight",["Turn left immediately","Go back to the station","Cross a river"]],
+            ["What should they do after going straight?","Turn right",["Turn left","Stop walking","Take a train"]],
+            ["What does the girl's advice help them find?","A quicker route",["A new restaurant","A bus ticket","A different city"]]
+        ]
+    },
+    {
+        passage:`READ THE PASSAGE:
+
+Tom lives in Green Street. His neighbourhood has a large park, a small grocery store and a modern library. The park is bigger than the one near his old home. The grocery store is cheaper than the supermarket in the city centre. However, Green Street is noisier than his old neighbourhood because many cars pass through it. Tom thinks the library is the most convenient place because he can walk there in five minutes.`,
+        questions:[
+            ["Where does Tom live?","Green Street",["King Street","River Road","Hill Street"]],
+            ["Which place is in Tom's neighbourhood?","A modern library",["A large airport","A cathedral","A palace"]],
+            ["What is bigger than the park near Tom's old home?","The park in Green Street",["The grocery store","The library","The supermarket"]],
+            ["Which shop is cheaper than the city-centre supermarket?","The grocery store",["The library","The park café","The railway station"]],
+            ["Why is Green Street noisier?","Many cars pass through it.",["There are many trains.","There is a large factory.","People play music all night."]],
+            ["How does Tom travel to the library?","He walks.",["He takes a train.","He drives a bus.","He rides a boat."]],
+            ["How long does it take Tom to walk to the library?","Five minutes",["Ten minutes","Twenty minutes","One hour"]],
+            ["Which place does Tom think is most convenient?","The library",["The park","The supermarket","The railway station"]],
+            ["What is the grocery store like compared with the supermarket?","It is cheaper.",["It is more expensive.","It is farther away.","It is larger."]],
+            ["Which statement is TRUE?","Green Street has a park, grocery store and library.",["Green Street has no shops.","Tom lives next to a railway station.","The library is an hour away."]]
+        ]
+    },
+    {
+        passage:`READ THE PASSAGE:
+
+Last Sunday, Anna and her brother visited the old town. They started at the railway station and walked along Main Street. First, they passed a small café. Then they crossed the road at the traffic lights and turned left. The town square was opposite a museum. They visited the museum before having lunch at a restaurant next to the square. Anna enjoyed the trip because the old buildings were beautiful and the streets were interesting.`,
+        questions:[
+            ["When did Anna visit the old town?","Last Sunday",["Last Monday","Yesterday morning","Two weeks ago"]],
+            ["Who went with Anna?","Her brother",["Her mother","Her father","Her friend"]],
+            ["Where did they start their journey?","At the railway station",["At the museum","At the restaurant","At the town square"]],
+            ["Which street did they walk along?","Main Street",["Green Street","River Road","King Street"]],
+            ["What did they pass first?","A small café",["A museum","A supermarket","A cathedral"]],
+            ["Where did they cross the road?","At the traffic lights",["At the railway station","In the museum","Behind the restaurant"]],
+            ["Which direction did they turn after crossing?","Left",["Right","Back","They did not turn."]],
+            ["Where was the town square?","Opposite a museum",["Behind the railway station","Next to the café","Inside the restaurant"]],
+            ["Where did they have lunch?","At a restaurant next to the square",["At the railway station","Inside the museum","At the café on Main Street"]],
+            ["Why did Anna enjoy the trip?","The old buildings were beautiful and the streets were interesting.",["She bought a new bicycle.","She dislikes museums.","The streets were empty."]]
+        ]
+    }
+];
+
+readingPassages.forEach((passageData,passageIndex)=>{
+    passageData.questions.forEach(([question,answer,wrong],questionIndex)=>{
+        addQuestion(
+            `${passageData.passage}\n\nQuestion ${questionIndex+1}: ${question}`,
+            answer,
+            wrong,
+            "Reading"
+        );
+    });
+});
+
+checkCategoryCount("Reading",categoryStart);
+
+
+/* =====================================================
+   PICTURE QUESTIONS
+   Images appear above the question text.
+   No extra picture-question label is added.
+===================================================== */
+
+function replaceWithPictureQuestion(searchText,data){
+    const index=QUESTION_BANK.findIndex(q=>q.question.includes(searchText));
+
+    if(index<0){
+        throw new Error("Picture question not found: "+searchText);
+    }
+
+    QUESTION_BANK[index]={
+        ...QUESTION_BANK[index],
+        question:data.question,
+        answer:data.answer,
+        choices:shuffle(data.choices),
+        image:data.image,
+        imageAlt:data.alt
+    };
+}
+
+function attachPicture(searchText,question,answer,choices,image,alt){
+    replaceWithPictureQuestion(searchText,{
+        question,
+        answer,
+        choices,
+        image,
+        alt
+    });
+}
+
+
+/* Original eight pictures */
+
+attachPicture(
+    'Which word means "a place where people look at paintings',
+    "Which place is shown in the picture?",
+    "Art gallery",
+    ["Art gallery","Cathedral","Railway station","Workshop"],
+    PICTURES.gallery,
+    "Art gallery"
+);
+
+attachPicture(
+    'Which word means "a large and important Christian church',
+    "What building is shown in the picture?",
+    "Cathedral",
+    ["Cathedral","Art gallery","Workshop","Railway station"],
+    PICTURES.cathedral,
+    "Cathedral"
+);
+
+attachPicture(
+    'Which word means "a place where trains stop',
+    "Which place is shown in the picture?",
+    "Railway station",
+    ["Railway station","Art gallery","Cathedral","Town square"],
+    PICTURES.station,
+    "Railway station"
+);
+
+attachPicture(
+    'Which word means "an open public area in a town',
+    "What kind of place is shown in the picture?",
+    "Town square",
+    ["Town square","Railway station","Art gallery","Workshop"],
+    PICTURES.square,
+    "Town square"
+);
+
+attachPicture(
+    'Which word means "an area outside the centre',
+    "What kind of residential area is shown?",
+    "A suburb",
+    ["A suburb","A town square","A railway station","An art gallery"],
+    PICTURES.suburb,
+    "Suburb"
+);
+
+attachPicture(
+    'Which place is described as "a place where people make or repair things',
+    "What kind of place is shown in the picture?",
+    "workshop",
+    ["workshop","art gallery","railway station","town square"],
+    PICTURES.workshop,
+    "Workshop"
+);
+
+attachPicture(
+    'Which direction means "Continue ahead without turning',
+    "What street feature can you see in the picture?",
+    "Traffic lights",
+    ["Traffic lights","Railway signals","Street signs","Shop signs"],
+    PICTURES.crossing,
+    "Traffic lights and pedestrian crossing"
+);
+
+attachPicture(
+    "Where are the boys visiting?",
+    "Which famous landmark in Hoi An is shown?",
+    "Chua Cau (Japanese Covered Bridge)",
+    ["Chua Cau (Japanese Covered Bridge)","Tan Ky House","A railway station","A cathedral"],
+    PICTURES.hoiAnBridge,
+    "Japanese Covered Bridge in Hoi An"
+);
+
+
+/* Additional pictures */
+
+attachPicture(
+    'Which place is described as "a green public area',
+    "What place is shown in the picture?",
+    "park",
+    ["park","factory","cinema","railway station"],
+    PICTURES.park,
+    "Park"
+);
+
+attachPicture(
+    'Which place is described as "a place where people pay to eat meals',
+    "What kind of place is shown?",
+    "restaurant",
+    ["restaurant","library","factory","museum"],
+    PICTURES.restaurant,
+    "Restaurant"
+);
+
+attachPicture(
+    'Which place is described as "a place where people buy coffee',
+    "What kind of place is shown?",
+    "café",
+    ["café","cathedral","stadium","workshop"],
+    PICTURES.cafe,
+    "Café"
+);
+
+attachPicture(
+    'Which place is described as "a place beside the sea',
+    "What natural place is shown in the picture?",
+    "beach",
+    ["beach","square","factory","library"],
+    PICTURES.beach,
+    "Beach"
+);
+
+attachPicture(
+    'Which place is described as "a place where people borrow or read books',
+    "Which place is shown?",
+    "library",
+    ["library","cinema","market","stadium"],
+    PICTURES.library,
+    "Library"
+);
+
+attachPicture(
+    'Which place is described as "a place where people learn about history',
+    "What kind of place is shown?",
+    "museum",
+    ["museum","restaurant","bus stop","gym"],
+    PICTURES.museum,
+    "Museum"
+);
+
+attachPicture(
+    'Which place is described as "a place where people watch films',
+    "What place is shown in the picture?",
+    "cinema",
+    ["cinema","theatre","library","market"],
+    PICTURES.cinema,
+    "Cinema"
+);
+
+attachPicture(
+    'Which place is described as "a place where people buy and sell things',
+    "What kind of place is shown?",
+    "market",
+    ["market","cathedral","hospital","workshop"],
+    PICTURES.market,
+    "Market"
+);
+
+
+/* =====================================================
+   FINAL BANK CHECKS
+===================================================== */
+
+const expectedCategories={
+    "Vocabulary":50,
+    "Neighbourhood places":50,
+    "Directions":50,
+    "Comparative adjectives":50,
+    "Pronunciation":50,
+    "Communication":50,
+    "Reading":50
+};
+
+for(const [topic,expected] of Object.entries(expectedCategories)){
+    const actual=QUESTION_BANK.filter(q=>q.topic===topic).length;
+
+    if(actual!==expected){
+        throw new Error(`${topic}: expected ${expected} questions, got ${actual}`);
+    }
+}
+
+if(QUESTION_BANK.length!==CONFIG.totalQuestions){
+    throw new Error(
+        `Expected ${CONFIG.totalQuestions} questions, got ${QUESTION_BANK.length}`
+    );
+}
+
+console.log("Question bank created:",QUESTION_BANK.length);
+console.log("Category counts:",expectedCategories);
+console.log("Picture questions:",QUESTION_BANK.filter(q=>q.image).length);
+
+
+/* =====================================================
+   CAMERA AND WORLD SELECT
+===================================================== */
+
+const camera=document.getElementById("camera");
+
+const scenes=[
+    document.getElementById("homeScene"),
+    document.getElementById("worldScene"),
+    document.getElementById("quizScene"),
+    document.getElementById("endingScene")
+];
+
+const endingScene=document.getElementById("endingScene");
+
+let currentScene=0;
+
+function moveCamera(index){
+    if(index<0||index>3)return;
+
+    currentScene=index;
+    camera.style.transform=`translateX(-${index*100}vw)`;
+
+    scenes.forEach((scene,i)=>{
+        scene.inert=i!==index;
+        scene.setAttribute("aria-hidden",i!==index?"true":"false");
+    });
+
+    paintHearts();
+}
+
+const worldList=document.getElementById("worldList");
+
+function renderWorlds(){
+    worldList.innerHTML="";
+
+    const back=document.createElement("button");
+    back.className="gameButton";
+    back.textContent="← BACK";
+    back.addEventListener("click",()=>moveCamera(0));
+    worldList.appendChild(back);
+
+    CONFIG.worlds.forEach(world=>{
+        const button=document.createElement("button");
+        button.className="gameButton worldButton";
+        button.textContent=world.name;
+        button.disabled=!world.playable;
+
+        if(world.playable){
+            button.addEventListener("click",()=>startQuiz(world));
+        }
+
+        worldList.appendChild(button);
+    });
+}
+
+renderWorlds();
+
+document.getElementById("startButton").addEventListener("click",()=>moveCamera(1));
+
+
+/* =====================================================
+   DRAWN HEARTS AND PHYSICS
+===================================================== */
+
+const heartCanvas=document.getElementById("heartCanvas");
+const heartCtx=heartCanvas.getContext("2d");
+
+let canvasWidth=window.innerWidth;
+let canvasHeight=window.innerHeight;
+let canvasDPR=Math.min(window.devicePixelRatio||1,2);
+
+let heartsAlive=[true,true,true];
+let heartFragments=[];
+let heartAnimationFrame=null;
+let lastHeartFrame=0;
+
+/*
+   Cache the heart shard images.
+   Previously, every wrong answer created several new canvases.
+   Now the images are generated once and reused.
+*/
+const heartShardCache=new Map();
+
+function resizeHeartCanvas(){
+    canvasWidth=window.innerWidth;
+    canvasHeight=window.innerHeight;
+    canvasDPR=Math.min(window.devicePixelRatio||1,2);
+
+    heartCanvas.width=Math.round(canvasWidth*canvasDPR);
+    heartCanvas.height=Math.round(canvasHeight*canvasDPR);
+    heartCanvas.style.width=canvasWidth+"px";
+    heartCanvas.style.height=canvasHeight+"px";
+
+    heartCtx.setTransform(canvasDPR,0,0,canvasDPR,0,0);
+    paintHearts();
+}
+
+function getHeartDimensions(){
+    const width=Math.min(76,Math.max(55,canvasWidth*.065));
+    const height=width*.92;
+    const gap=Math.max(8,width*.17);
+
+    return{
+        width,height,gap,
+        left:Math.max(14,canvasWidth*.025),
+        bottom:Math.max(17,canvasHeight*.028)
+    };
+}
+
+function getHeartPosition(index){
+    const d=getHeartDimensions();
+
+    return{
+        x:d.left+index*(d.width+d.gap),
+        y:canvasHeight-d.bottom-d.height,
+        width:d.width,
+        height:d.height
+    };
+}
+
+function makeHeartPath(x,y,w,h){
+    const path=new Path2D();
+
+    path.moveTo(x+w*.5,y+h*.96);
+    path.bezierCurveTo(x+w*.16,y+h*.70,x-w*.04,y+h*.42,x+w*.09,y+h*.20);
+    path.bezierCurveTo(x+w*.22,y-.02*h,x+w*.45,y+h*.06,x+w*.5,y+h*.29);
+    path.bezierCurveTo(x+w*.55,y+h*.06,x+w*.78,y-.02*h,x+w*.91,y+h*.20);
+    path.bezierCurveTo(x+w*1.04,y+h*.42,x+w*.84,y+h*.70,x+w*.5,y+h*.96);
+    path.closePath();
+
+    return path;
+}
+
+function drawHeart(x,y,w,h){
+    const path=makeHeartPath(x,y,w,h);
+
+    heartCtx.save();
+    heartCtx.fillStyle="#ed263e";
+    heartCtx.fill(path);
+    heartCtx.lineWidth=Math.max(1.5,w*.045);
+    heartCtx.strokeStyle="#751626";
+    heartCtx.stroke(path);
+    heartCtx.restore();
+}
+
+function createHeartShardImages(w,h,count=9){
+    const cacheKey=`${Math.round(w)}x${Math.round(h)}_${count}`;
+
+    if(heartShardCache.has(cacheKey)){
+        return heartShardCache.get(cacheKey);
+    }
+
+    const output=[];
+    const cx=w/2;
+    const cy=h/2;
+    const radius=Math.max(w,h)*3;
+    const heart=makeHeartPath(0,0,w,h);
+
+    for(let i=0;i<count;i++){
+        const a1=(i/count)*Math.PI*2;
+        const a2=((i+1)/count)*Math.PI*2;
+
+        const p1={
+            x:cx+Math.cos(a1)*radius,
+            y:cy+Math.sin(a1)*radius
+        };
+
+        const p2={
+            x:cx+Math.cos(a2)*radius,
+            y:cy+Math.sin(a2)*radius
+        };
+
+        const shard=document.createElement("canvas");
+        shard.width=Math.ceil(w*2);
+        shard.height=Math.ceil(h*2);
+
+        const ctx=shard.getContext("2d");
+        ctx.setTransform(2,0,0,2,0,0);
+        ctx.save();
+        ctx.clip(heart);
+        ctx.beginPath();
+        ctx.moveTo(cx,cy);
+        ctx.lineTo(p1.x,p1.y);
+        ctx.lineTo(p2.x,p2.y);
+        ctx.closePath();
+        ctx.clip();
+        ctx.fillStyle=i%2===0?"#ed263e":"#ce1933";
+        ctx.fillRect(0,0,w,h);
+        ctx.restore();
+
+        output.push(shard);
+    }
+
+    heartShardCache.set(cacheKey,output);
+    return output;
+}
+
+function spawnHeartBreak(index){
+    if(index<0||index>=3||!heartsAlive[index])return;
+
+    heartsAlive[index]=false;
+
+    const pos=getHeartPosition(index);
+    const cx=pos.x+pos.width/2;
+    const cy=pos.y+pos.height/2;
+    const shards=createHeartShardImages(pos.width,pos.height,9);
+
+    shards.forEach((image,i)=>{
+        const angle=(i/shards.length)*Math.PI*2;
+        const speed=100+Math.random()*180;
+
+        heartFragments.push({
+            image,
+            x:cx,
+            y:cy,
+            vx:Math.cos(angle)*speed+(Math.random()-.5)*100,
+            vy:Math.sin(angle)*speed-180-Math.random()*140,
+            rotation:(Math.random()-.5)*.8,
+            angularVelocity:(Math.random()-.5)*15,
+            width:pos.width,
+            height:pos.height,
+            age:0,
+            opacity:1
+        });
+    });
+
+    paintHearts();
+    startHeartPhysics();
+}
+
+function paintHearts(){
+    heartCtx.clearRect(0,0,canvasWidth,canvasHeight);
+
+    if(currentScene===2){
+        heartsAlive.forEach((alive,index)=>{
+            if(!alive)return;
+
+            const p=getHeartPosition(index);
+            drawHeart(p.x,p.y,p.width,p.height);
+        });
+    }
+
+    heartFragments.forEach(p=>{
+        heartCtx.save();
+        heartCtx.globalAlpha=p.opacity??1;
+        heartCtx.translate(p.x,p.y);
+        heartCtx.rotate(p.rotation);
+        heartCtx.drawImage(p.image,-p.width/2,-p.height/2,p.width,p.height);
+        heartCtx.restore();
+    });
+}
+
+function startHeartPhysics(){
+    if(heartAnimationFrame!==null)return;
+
+    lastHeartFrame=0;
+    heartAnimationFrame=requestAnimationFrame(updateHeartPhysics);
+}
+
+function updateHeartPhysics(timestamp){
+    const dt=lastHeartFrame?Math.min((timestamp-lastHeartFrame)/1000,.035):.016;
+    lastHeartFrame=timestamp;
+
+    const gravity=1500;
+    const floor=canvasHeight-3;
+
+    for(let i=heartFragments.length-1;i>=0;i--){
+        const p=heartFragments[i];
+
+        p.age+=dt;
+        p.vy+=gravity*dt;
+        p.x+=p.vx*dt;
+        p.y+=p.vy*dt;
+        p.rotation+=p.angularVelocity*dt;
+
+        if(p.y+p.height/2>floor){
+            p.y=floor-p.height/2;
+
+            if(Math.abs(p.vy)>65)p.vy*=-.27;
+            else p.vy=0;
+
+            p.vx*=.73;
+            p.angularVelocity*=.70;
+        }
+
+        p.opacity=p.age>2.1?Math.max(0,1-(p.age-2.1)/1.2):1;
+
+        if(p.age>3.3)heartFragments.splice(i,1);
+    }
+
+    paintHearts();
+
+    if(heartFragments.length>0){
+        heartAnimationFrame=requestAnimationFrame(updateHeartPhysics);
+    }else{
+        heartAnimationFrame=null;
+        lastHeartFrame=0;
+    }
+}
+
+function resetHeartEffects(){
+    heartsAlive=[true,true,true];
+    heartFragments=[];
+
+    if(heartAnimationFrame!==null){
+        cancelAnimationFrame(heartAnimationFrame);
+        heartAnimationFrame=null;
+    }
+
+    lastHeartFrame=0;
+    paintHearts();
+}
+
+window.addEventListener("resize",resizeHeartCanvas);
+resizeHeartCanvas();
+
+
+/* =====================================================
+   GAME STATE
+===================================================== */
+
+let quizQuestions=[];
+let playerAnswers=[];
+let currentWorld=null;
+let questionIndex=0;
+let questionsCompleted=0;
+let score=0;
+let lives=CONFIG.startingLives;
+let selectedAnswer=null;
+let gameEnded=false;
+let timerInterval=null;
+let deadline=0;
+let remainingSeconds=CONFIG.timeLimit;
+
+const questionCounter=document.getElementById("questionCounter");
+const questionText=document.getElementById("questionText");
+const questionMedia=document.getElementById("questionMedia");
+const answerGrid=document.getElementById("answerGrid");
+const timerText=document.getElementById("timerText");
+const deathPanel=document.getElementById("deathPanel");
+const successPanel=document.getElementById("successPanel");
+
+
+/* =====================================================
+   SECRET QUESTION
+===================================================== */
+
+const specialOverlay=document.getElementById("specialEventOverlay");
+const specialGun=document.getElementById("specialGun");
+
+let specialEventUsed=false;
+let specialQuestionToken=0;
+
+function hideSpecialEvent(){
+    specialQuestionToken++;
+    specialOverlay.style.display="none";
+    specialGun.classList.remove("visible");
+}
+
+function createSecretQuestion(){
+    return{
+        secret:true,
+        question:"screw you"
+    };
+}
+
+async function runSecretQuestion(){
+    const token=++specialQuestionToken;
+    const stillActive=()=>!gameEnded&&token===specialQuestionToken;
+
+    /*
+       The secret question costs one additional life.
+       It breaks the last remaining heart.
+    */
+    const heartIndex=lives-1;
+
+    if(lives<=1||heartIndex<0||!heartsAlive[heartIndex]){
+        hideSpecialEvent();
+        endGame(false);
+        return;
+    }
+
+    lives--;
+
+    specialOverlay.style.display="block";
+    specialGun.classList.remove("visible");
+
+    await delay(650);
+    if(!stillActive())return;
+
+    const heart=getHeartPosition(heartIndex);
+    const targetX=heart.x+heart.width/2;
+    const targetY=heart.y+heart.height/2;
+
+    const gunX=canvasWidth*(.35+Math.random()*.55);
+    const gunY=canvasHeight*(.08+Math.random()*.48);
+    const angle=Math.atan2(targetY-gunY,targetX-gunX)*180/Math.PI;
+
+    specialGun.style.left=gunX+"px";
+    specialGun.style.top=gunY+"px";
+    specialGun.style.setProperty("--gun-angle",angle+"deg");
+
+    void specialGun.offsetWidth;
+    specialGun.classList.add("visible");
+
+    /* Wait for the 0.55-second fade-in to finish */
+    await delay(550);
+    if(!stillActive())return;
+
+    /* Wait another 2 seconds before shooting */
+    await delay(2000);
+    if(!stillActive())return;
+
+    spawnHeartBreak(heartIndex);
+
+    /*
+       Start all three sounds together without waiting for
+       their full audio durations to finish.
+    */
+    playSound(CONFIG.sounds.shoot);
+    playSound(CONFIG.sounds.heartSmash);
+    playSound(CONFIG.sounds.loseMock);
+
+    await delay(650);
+    if(!stillActive())return;
+
+    hideSpecialEvent();
+
+    playerAnswers.push({
+        question:"screw you",
+        selected:"Special question",
+        correct:"Special question",
+        special:true
+    });
+
+    questionsCompleted++;
+    updateQuestionCounter();
+
+    if(lives<=0){
+        endGame(false);
+        return;
+    }
+
+    nextQuestion();
+}
+
+
+/* =====================================================
+   TIMER
+===================================================== */
+
+function formatTime(seconds){
+    const minutes=Math.floor(seconds/60);
+    const secs=seconds%60;
+
+    return String(minutes).padStart(2,"0")+":"+String(secs).padStart(2,"0");
+}
+
+function updateTimerDisplay(){
+    timerText.textContent=formatTime(remainingSeconds);
+    timerText.classList.toggle("urgent",remainingSeconds<=15);
+}
+
+function startTimer(){
+    stopTimer();
+
+    remainingSeconds=CONFIG.timeLimit;
+    deadline=Date.now()+CONFIG.timeLimit*1000;
+
+    updateTimerDisplay();
+
+    timerInterval=setInterval(()=>{
+        if(gameEnded)return;
+
+        remainingSeconds=Math.max(0,Math.ceil((deadline-Date.now())/1000));
+        updateTimerDisplay();
+
+        if(remainingSeconds<=0)endGame(false);
+    },100);
+}
+
+function stopTimer(){
+    if(timerInterval!==null){
+        clearInterval(timerInterval);
+        timerInterval=null;
+    }
+}
+
+
+/* =====================================================
+   START QUIZ
+===================================================== */
+
+function startQuiz(world){
+    stopTimer();
+
+    deathSequenceToken++;
+    document.getElementById("jumpscareOverlay").style.display="none";
+
+    stopJumpscareSound();
+    stopHurtSound();
+    hideSpecialEvent();
+    stopDeathMusic();
+
+    currentWorld=world;
+    quizQuestions=shuffle(QUESTION_BANK).slice(0,CONFIG.questionsPerRun);
+
+    questionIndex=0;
+    questionsCompleted=0;
+    score=0;
+    lives=CONFIG.startingLives;
+    selectedAnswer=null;
+    gameEnded=false;
+    playerAnswers=[];
+
+    specialEventUsed=false;
+
+    resetHeartEffects();
+
+    endingScene.classList.remove("deathVisible");
+    deathPanel.style.display="none";
+    successPanel.style.display="none";
+    document.getElementById("endingButtons").style.display="flex";
+
+    startMusic();
+    renderQuestion();
+    updateQuestionCounter();
+    moveCamera(2);
+    paintHearts();
+    startTimer();
+}
+
+
+/* =====================================================
+   QUESTION COUNTER AND RENDER
+===================================================== */
+
+function updateQuestionCounter(){
+    questionCounter.textContent=`${questionsCompleted}/${quizQuestions.length}`;
+}
+
+function renderQuestion(){
+    selectedAnswer=null;
+
+    const question=quizQuestions[questionIndex];
+
+    if(question.secret){
+        questionText.textContent="screw you";
+
+        questionMedia.innerHTML="";
+
+        const image=document.createElement("img");
+        image.src=CONFIG.images.secretFace;
+        image.alt="Secret question image";
+        image.loading="eager";
+        image.referrerPolicy="no-referrer";
+
+        image.onerror=()=>{
+            questionMedia.style.display="none";
+            questionMedia.innerHTML="";
+        };
+
+        questionMedia.appendChild(image);
+        questionMedia.style.display="block";
+
+        answerGrid.innerHTML="";
+        answerGrid.style.display="none";
+
+        updateQuestionCounter();
+
+        void runSecretQuestion();
+        return;
+    }
+
+    answerGrid.style.display="grid";
+
+    questionText.textContent=question.question;
+    questionText.style.fontSize=question.topic==="Reading"
+        ?"clamp(13px,1.65vw,18px)"
+        :"";
+
+    questionText.style.lineHeight=question.topic==="Reading"
+        ?"1.45"
+        :"1.35";
+
+    questionMedia.innerHTML="";
+    questionMedia.style.display="none";
+
+    if(question.image){
+        const image=document.createElement("img");
+        image.src=question.image;
+        image.alt=question.imageAlt||"Question image";
+        image.loading="eager";
+        image.referrerPolicy="no-referrer";
+
+        image.onerror=()=>{
+            questionMedia.style.display="none";
+            questionMedia.innerHTML="";
+        };
+
+        questionMedia.appendChild(image);
+        questionMedia.style.display="block";
+    }
+
+    answerGrid.innerHTML="";
+
+    shuffle(question.choices).forEach(option=>{
+        const button=document.createElement("button");
+        button.className="answerButton";
+
+        const label=document.createElement("span");
+        label.className="answerLabel";
+        label.textContent=option;
+
+        button.appendChild(label);
+        button.addEventListener("click",()=>chooseAnswer(option,button));
+
+        answerGrid.appendChild(button);
+    });
+
+    updateQuestionCounter();
+}
+
+function replaceButtonWithImage(button,filename,altText){
+    const oldImage=button.querySelector(".answerFeedbackImage");
+    if(oldImage)oldImage.remove();
+
+    const image=document.createElement("img");
+    image.className="answerFeedbackImage";
+    image.src=filename;
+    image.alt=altText;
+    image.draggable=false;
+
+    button.appendChild(image);
+}
+
+
+/* =====================================================
+   ANSWER HANDLING
+===================================================== */
+
+async function chooseAnswer(answer,clickedButton){
+    if(selectedAnswer!==null||gameEnded)return;
+
+    selectedAnswer=answer;
+
+    const question=quizQuestions[questionIndex];
+
+    playerAnswers.push({
+        question:question.question,
+        selected:answer,
+        correct:question.answer
+    });
+
+    answerGrid.querySelectorAll(".answerButton").forEach(button=>{
+        button.disabled=true;
+    });
+
+    const isCorrect=answer===question.answer;
+
+    if(isCorrect){
+        score++;
+
+        replaceButtonWithImage(
+            clickedButton,
+            CONFIG.images.correct,
+            "Correct"
+        );
+
+        await Promise.all([
+            playSoundAndWait(CONFIG.sounds.correct,CONFIG.correctVolume),
+            delay(CONFIG.correctFeedbackTime)
+        ]);
+
+    }else{
+        const brokenHeartIndex=lives-1;
+
+        lives--;
+
+        replaceButtonWithImage(
+            clickedButton,
+            CONFIG.images.wrong,
+            "Wrong"
+        );
+
+        /*
+           Play the wrong sound without blocking the game
+           until the entire audio file finishes.
+           The original 500ms delay is unchanged.
+        */
+        playSound(CONFIG.sounds.wrong,CONFIG.wrongVolume);
+
+        await delay(CONFIG.wrongSoundDelay);
+        if(gameEnded)return;
+
+        spawnHeartBreak(brokenHeartIndex);
+
+        /*
+           Play the heart sounds concurrently.
+           Keep the original 650ms feedback delay unchanged.
+        */
+        playSound(CONFIG.sounds.heartSmash);
+        playSound(CONFIG.sounds.loseMock);
+
+        await delay(CONFIG.wrongFeedbackTime);
+    }
+
+    if(gameEnded)return;
+
+    questionsCompleted++;
+    updateQuestionCounter();
+
+    if(lives<=0){
+        endGame(false);
+        return;
+    }
+
+    /*
+       SECRET CHANCE:
+       Evaluated after either a correct OR wrong answer.
+       It only triggers when more than one life remains.
+    */
+    const hasNextQuestion=questionIndex<quizQuestions.length-1;
+
+    const triggerSecret=
+        lives>1&&
+        hasNextQuestion&&
+        !specialEventUsed&&
+        Math.random()<CONFIG.secretChance;
+
+    if(triggerSecret){
+        specialEventUsed=true;
+        quizQuestions[questionIndex+1]=createSecretQuestion();
+    }
+
+    nextQuestion();
+}
+
+
+/* =====================================================
+   NEXT QUESTION
+===================================================== */
+
+function nextQuestion(){
+    if(gameEnded)return;
+
+    questionIndex++;
+
+    if(questionIndex>=quizQuestions.length){
+        endGame(true);
+        return;
+    }
+
+    renderQuestion();
+}
+
+
+/* =====================================================
+   ANSWER REVIEW
+===================================================== */
+
+function renderAnswerReview(){
+    const results=document.getElementById("answerResults");
+    results.innerHTML="";
+
+    playerAnswers.forEach((item,index)=>{
+        const entry=document.createElement("div");
+        entry.className="resultItem";
+
+        if(item.special){
+            const q=document.createElement("div");
+            q.className="resultQuestion";
+            q.textContent=`${index+1}. screw you`;
+
+            const special=document.createElement("div");
+            special.className="resultYourAnswer";
+            special.textContent="Special question";
+
+            entry.append(q,special);
+            results.appendChild(entry);
+            return;
+        }
+
+        if(item.selected!==item.correct){
+            entry.classList.add("incorrect");
+        }
+
+        const q=document.createElement("div");
+        q.className="resultQuestion";
+        q.textContent=`${index+1}. ${item.question}`;
+
+        const yours=document.createElement("div");
+        yours.className="resultYourAnswer";
+        yours.textContent=`Your answer: ${item.selected}`;
+
+        const correct=document.createElement("div");
+        correct.className="resultCorrectAnswer";
+        correct.textContent=`Correct answer: ${item.correct}`;
+
+        entry.append(q,yours,correct);
+        results.appendChild(entry);
+    });
+}
+
+
+/* =====================================================
+   END GAME
+===================================================== */
+
+function endGame(survived){
+    if(gameEnded)return;
+
+    gameEnded=true;
+
+    stopTimer();
+    hideSpecialEvent();
+    stopMusic();
+    stopDeathMusic();
+    stopHurtSound();
+
+    endingScene.classList.remove("deathVisible");
+    deathPanel.style.display="none";
+    successPanel.style.display="none";
+
+    document.getElementById("endingButtons").style.display="flex";
+
+    if(survived){
+        successPanel.style.display="block";
+        renderAnswerReview();
+        moveCamera(3);
+    }else{
+        showDeathAfterJumpscare();
+    }
+}
+
+async function showDeathAfterJumpscare(){
+    const token=++deathSequenceToken;
+
+    await playJumpscare();
+
+    if(token!==deathSequenceToken)return;
+
+    deathPanel.style.display="block";
+
+    document.getElementById("civilianImage").src=CONFIG.images.civilian;
+    document.getElementById("deathTitle").textContent="YOU DIED";
+    document.getElementById("deathMessage").textContent=randomItem(CONFIG.deathMessages);
+
+    startDeathMusic();
+    playRandomHurtSound();
+
+    void endingScene.offsetWidth;
+    endingScene.classList.add("deathVisible");
+
+    moveCamera(3);
+}
+
+
+/* =====================================================
+   END SCREEN BUTTONS
+===================================================== */
+
+document.getElementById("retryButton").addEventListener("click",()=>{
+    if(currentWorld)startQuiz(currentWorld);
+});
+
+document.getElementById("homeButton").addEventListener("click",()=>{
+    stopTimer();
+
+    deathSequenceToken++;
+
+    document.getElementById("jumpscareOverlay").style.display="none";
+
+    stopJumpscareSound();
+    stopHurtSound();
+    stopMusic();
+    stopDeathMusic();
+    hideSpecialEvent();
+
+    gameEnded=false;
+
+    resetHeartEffects();
+
+    endingScene.classList.remove("deathVisible");
+    deathPanel.style.display="none";
+    successPanel.style.display="none";
+
+    moveCamera(0);
+});
+
+
+/* =====================================================
+   INITIALIZATION
+===================================================== */
+
+moveCamera(0);
+resetHeartEffects();
+
+console.log("Slop Quiz loaded.");
+console.log("Question bank:",QUESTION_BANK.length);
+console.log("Picture questions:",QUESTION_BANK.filter(q=>q.image).length);
+console.log("Questions per game:",CONFIG.questionsPerRun);
+console.log("Lives:",CONFIG.startingLives);
+console.log("Timer:",CONFIG.timeLimit);
+
+</script>
+</body>
+</html>
